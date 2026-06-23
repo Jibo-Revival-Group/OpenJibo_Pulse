@@ -19,4 +19,49 @@ Jibo's lifeline. OpenJibo Pulse is a physical modding tool that simplifies serve
 | Oval Tactile Switch Cap (Green) | BTN K03 50 | 1 | *$0.82* |
 | Oval Tactile Switch Cap (Red) | BTN K03 40 | 1 | *$0.54* |
 
+### Pimoroni Unicorn HAT Mini (Manual Setup)
+#### Debian Trixie (Latest Release)
+### Step 1: Install the Core Library
+```python
+sudo pip3 install unicornhatmini --break-system-packages
+```
+### Step 2: Clone the Example Scripts
+```python
+cd ~
+git clone https://github.com/pimoroni/unicornhatmini-python
+```
+### Step 3: Patch the Library Files
+To stop the kernel validation crashes, modify the core library file to hand control over to the system SPI driver.
+```python
+sudo nano /usr/local/lib/python3.13/dist-packages/unicornhatmini/__init__.py
+```
+Apply the following three modifications:
+#### A. Re-enable Hardware Chip Select
+Locate the matrix initialization loop. Change `device.no_cs = True` to **`device.no_cs = False`**:
+```python
+for device, pin, offset in self.left_matrix, self.right_matrix:
+    device.no_cs = False  # Changed from True
+    device.max_speed_hz = spi_max_speed_hz
+```
+#### B. Bypass Strict Pin Setup Checks
+Directly below that block, wrap the `GPIO.setup` call inside a `try...except` block so it doesn't crash on busy hardware lines:
+```python
+    try:
+        GPIO.setup(pin, GPIO.OUT, initial=GPIO.HIGH)
+    except Exception:
+        pass
+```
+#### C. Disable Manual Software Pin Toggling
+Use `Ctrl+W` to search for `def xfer`. Comment out (`#`) the manual software pin overrides. The underlying SPI hardware bus will now manage these line switches automatically:
+```python
+def xfer(self, device, pin, command):
+    # Comment out manual software bit-banging:
+    # GPIO.output(pin, GPIO.LOW)
+    device.xfer2(command)
+    # GPIO.output(pin, GPIO.HIGH)
+```
+Save and exit the editor (`Ctrl+O`, `Enter`, `Ctrl+X`).
+
+Navigate to the `unicornhatmini-python` to test some examples! 🥳
+
 ### Much more coming soon... 👀
